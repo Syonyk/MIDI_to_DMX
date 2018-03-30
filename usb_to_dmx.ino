@@ -2,6 +2,10 @@
 // Else, will build as serial MIDI (for prototype units)
 #define USE_USB_MIDI
 
+// Define this to print out state to serial.  Useful for debugging.
+// Leave this off in production.  This ONLY WORKS ON THE PRO MINI.
+//#define PRINT_STATE
+
 #include <EEPROM.h>
 
 // REQUIRES LIBRARY:
@@ -66,6 +70,10 @@ uint32_t fade_start_millis = 0, fade_end_millis = 0;
 // True if the scene is stored to EEPROM.
 bool scene_is_stored_to_eeprom = 0;
 
+#ifdef PRINT_STATE
+uint32_t last_print_time = 0;
+#endif
+
 /**
  * One problem encountered during development: Power blips.  If the presentation
  * machine USB bus is reset, the converter resets, which means that the start
@@ -112,6 +120,22 @@ byte get_build_hash() {
 
   return xor_stamp;
 }
+
+/**
+ * Print the state, if enabled.  This is useful for debugging without a full
+ * set of lights.
+ */
+#ifdef PRINT_STATE
+void print_state() {
+  Serial.println(F("====Current Channel State===="));
+  for (uint8_t i = 0; i < MAX_UNIQUE_CHANNELS; i++) {
+    Serial.print(F("["));
+    Serial.print(pgm_read_byte_near(&scene_slot_to_channel_mapping[i]));
+    Serial.print(F("]: "));
+    Serial.println(dmxBuffer[pgm_read_byte_near(&scene_slot_to_channel_mapping[i]) - 1]);
+  }
+}
+#endif
 
 /**
  * On power on, attempt to restore the settings from EEPROM.  This only happens
@@ -453,8 +477,12 @@ void setup() {
   delay(2000);
   
   // Hardware serial is used for the MIDI side - set MIDI baud rate 31.25kHz
-#ifdef USE_USB_MIDI
+#ifndef USE_USB_MIDI
   Serial.begin(31250);
+#endif
+
+#ifdef PRINT_STATE
+  Serial.begin(115200);
 #endif
   
   // Check to see if we are restoring from old state, or creating new state.
@@ -517,6 +545,10 @@ void loop() {
       // Data 0 (Note) is the scene ID, Data 1 (Velocity) is the fade time.
       if (command.command == COMMAND_SCENE) {
         set_scene_with_fade_time(command.data0, command.data1);
+        #ifdef PRINT_STATE
+        Serial.print(F("Setting scene: "));
+        Serial.println(command.data0);
+        #endif
       } 
       
       // Channel is the fixture #, data0 (note) is color or brightness, and
@@ -543,4 +575,12 @@ void loop() {
 
   // Run the fader to update values as needed.
   run_fader();
+
+  // Print state every ~8s if needed.
+#ifdef PRINT_STATE
+  if ((millis() >> 13) > last_print_time) {
+    print_state();
+    last_print_time = millis() >> 13;
+  }
+#endif
 }

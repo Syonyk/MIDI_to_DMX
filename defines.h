@@ -51,6 +51,14 @@
 
 #define MS_PER_SECOND 1000
 
+/*
+ * Dim a given value to a given percent (0-100).
+ * 
+ * This is only valid on DMX 0-255 values with a uint16_t as the type.
+ */
+
+#define DIM(value, percent) (((uint16_t)value * percent) / 100)
+
 /**
  * 4-byte MIDI command structure - the three data bytes are broken apart into
  * the desired command, and the data values.
