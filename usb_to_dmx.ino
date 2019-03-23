@@ -65,6 +65,7 @@ extern volatile uint8_t dmxBuffer[DMX_SIZE];
  */
 byte fade_start_values[MAX_DMX_CHANNELS] = {0};
 byte fade_target_values[MAX_DMX_CHANNELS] = {0};
+byte fade_current_values[MAX_DMX_CHANNELS] = {0};
 uint32_t fade_start_millis = 0, fade_end_millis = 0;
 
 // True if the scene is stored to EEPROM.
@@ -297,13 +298,31 @@ uint8_t scale_brightness(const uint8_t brightness) {
  * non-zero values in these indicate that a fade needs to run.  If both the
  * start and end values are identical, the new value is set without any fade.
  * 
+ * If a fade is already running, this will copy the current fade values to the
+ * start array, and extend the fade.  This should work reasonably well for most
+ * use cases.
+ * 
  * This also marks that the scene needs to be stored to EEPROM after completion
  * for restoration on powerup.
  */
 void set_fade(const uint8_t fade_seconds) {
-  fade_start_millis = millis();
+  // This needs to be reset for the new fade.
+  fade_start_millis = millis();  
   
-  fade_end_millis = fade_start_millis + (fade_seconds * MS_PER_SECOND);
+  // Case: Fade running.
+  if (fade_end_millis && fade_start_millis) {
+    // Copy current state to the start.
+    for (int i = 0; i < MAX_DMX_CHANNELS; i++) {
+      fade_start_values[i] = fade_current_values[i];
+    }
+
+    // Just stretch the fade.
+    fade_end_millis = fade_end_millis + (fade_seconds * MS_PER_SECOND);
+  } 
+  // Case: No fade running, start a new one.
+  else {
+    fade_end_millis = fade_start_millis + (fade_seconds * MS_PER_SECOND);
+  }
   
   scene_is_stored_to_eeprom = 0;
 }
@@ -454,6 +473,7 @@ void run_fader() {
 
     // No point in doing expensive math on things that aren't changing...
     if (old_value == new_value) {
+      fade_current_values[i] = new_value;
       continue;
     }
     
@@ -466,6 +486,10 @@ void run_fader() {
     
     // Apply the offset to the old value to get the midpoint channel value.
     value = old_value + temp;
+
+    // Store the current value to the in-process structure in case the fade
+    // switches mid-fade.
+    fade_current_values[i] = value;
     
     DmxMaster.write(i, value);
   }
