@@ -36,6 +36,14 @@
 #define BRIGHTNESS_FULL 255
 
 /**
+ * Brightness values for the overhead LEDs.  The new light strand doesn't
+ * behave particularly well, these values work better.  Off and full
+ * reuse the above values.
+ */
+#define BRIGHTNESS_LED_MUSIC 40
+#define BRIGHTNESS_LED_SERMON 150
+
+/**
  * MIDI command masks (to get the command out of the first byte) and what the
  * corresponding byte values for each command type will be.
  */
