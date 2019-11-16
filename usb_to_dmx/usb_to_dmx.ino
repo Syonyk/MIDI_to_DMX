@@ -334,10 +334,13 @@ void set_fade(const uint8_t fade_seconds) {
  * scene to the target_values array, as the fader only updates values that don't
  * match already for performance reasons.
  * 
+ * However, it now won't call for a fade if the same scene is called for.
+ * 
  * @param scene The scene index from scene.h
  */
 void set_scene_with_fade_time(const byte scene, const byte fade_seconds) {
   byte channel, value;
+  byte fade_required = false;
   
   // Don't read invalid scenes in.
   if (scene >= MAX_SCENE_COUNT) return;
@@ -345,10 +348,16 @@ void set_scene_with_fade_time(const byte scene, const byte fade_seconds) {
   for (byte i = 0; i < MAX_UNIQUE_CHANNELS; i++) {
     channel = pgm_read_byte_near(&scene_slot_to_channel_mapping[i]);
     value = pgm_read_byte_near(&scenes[scene][i]);
+    if (value != fade_target_values[channel]) {
+      fade_required = true;
+    }
     fade_target_values[channel] = value;
   }
-  
-  set_fade(fade_seconds);
+
+  // If anything has changed in the targets, run the fade.
+  if (fade_required) {
+    set_fade(fade_seconds);
+  }
 }
 
 /**
